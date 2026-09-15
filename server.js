@@ -1,5 +1,42 @@
 // Importa o modulo nativo 'http' do Node.js
 const http = require('http');
+const mysql = require('mysql2');
+
+// 1 . Configura a conexão com o MySQL
+const connection = mysql.createConnection(
+    {
+        host: 'localhost',
+        user: 'root',
+        password: '',
+        database: 'petshopmorango'
+    }
+);
+
+// Conecta ao banco de dados
+connection.connect( (err) =>{
+    if (err) {
+        console.error('Erro ao conectar MySQL: ', err.stack);
+        return;
+    }
+    console.log('Conectado ao MySQL com sucesso!');
+
+    // Cria a tabela 'alunos' caso ela não exista 
+    const createTableQuery = `
+        CREATE TABLE IF NOT EXISTS alunos(
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            nome VARCHAR(255) NOT NULL
+        )`;
+
+        connection.query( createTableQuery, (err) => {
+        if (err) {
+            console.error('Erro ao criar tabela: ', err.stack);
+            return;
+        }
+        });
+
+
+} );
+
 
 // Define o endereco (localhost) e a porta onde o servidor vai escutar
 const hostname = '127.0.0.1';
@@ -13,7 +50,21 @@ const server = http.createServer((req, res) => {
         return res.end('<h1>Página inicial<h1>'); // O return impede a execução das linhas de baixo
     }
 
-    if (req.url === '/alunos') {
+    if (req.url === '/alunos' && req.method === 'GET') {
+        connection.query('SELECT * FROM alunos;', (err, results) => {
+            if (err) {
+                res.writeHead(500, {'Content-Type': 'text/html; charset=utf-8'});
+                res.end(JSON.stringfy({ erro: err.message }));
+                return;
+            }
+
+                
+            res.writeHead(200, {'Content-Type': 'text/html; charset=utf-8'});
+            res.end(JSON.stringfy( results ));
+                
+
+        });
+
         res.writeHead(200, {'Content-Type': 'text/html; charset=utf-8'});
         return res.end('<h1>Lista de Alunos</h1>'); // O return impede a execução das linhas de baixo
     }
