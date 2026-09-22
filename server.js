@@ -1,5 +1,11 @@
-const http = require('http');
+const express = require('express');
 const mysql = require('mysql2');
+
+const app = express();
+const port = 3000;
+
+// Middleware(ponte) para o Express entender JSON no corpo da requisição (req.body)
+app.use(express.json());
 
 // 1. Configura a conexão com o MySQL
 const connection = mysql.createConnection({
@@ -31,44 +37,15 @@ connection.connect((err) => {
       } );
 });
 
-const hostname = '127.0.0.1';
-const port = 3000;
-
-const server = http.createServer((req, res) => {
- 
-  if (req.url === '/' ) {
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    res.end('<h1>Página Inicial</h1>'); // O return impede a execução das linhas de baixo
-    return;
-  }
- 
-  if (req.url === '/alunos' && req.method === 'GET') {
-    connection.query('SELECT * FROM alunos;', (err, results) => {
-      if (err) {
-        res.writeHead(500, { 'Content-Type': 'text/json; charset=utf-8' });
-        res.end(JSON.stringify({ erro: err.message }));
-        return;
-      }
-
-      res.writeHead(200, { 'Content-Type': 'text/json; charset=utf-8' });
-      return res.end(JSON.stringify( results ));        
-
+app.get('/alunos', (req, res) => {
+    connection.query('SELECT * FROM alunos', (err, results) => {
+        if (err) {
+            return res.status(500).json({ erro: 'Erro ao buscar alunos'});
+        }
+        res.json(results);
     });
-   
-   
-    // res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    // return res.end('<h1>Lista de Alunos</h1>'); // O return impede a execução das linhas de baixo
-  }
-
-  // Se nehuma rota acima for satisfeita, cai no 404
-  //res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
- 
-  // Envia a resposta para o navegador/cliente
-  //return res.end('<h1 style="color: red;">404 - rota não encontrada</h1>');
-
-
 });
 
-server.listen(port, hostname, () => {
-  console.log(`Servidor rodando em http://${hostname}:${port}/`);
+app.listen(port, () => {
+  console.log(`Servidor rodando em http://localhost':${port}/`);
 });
