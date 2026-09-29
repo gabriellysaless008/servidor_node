@@ -17,7 +17,7 @@ const connection = mysql.createConnection({
     host: 'localhost',
     user: 'root',
     password: '',
-    database: 'petshopmorango'
+    database: 'vestShop'
 });
 
 // Conecta ao banco de dados
@@ -28,11 +28,14 @@ connection.connect((err) => {
     }
     console.log('Conectado ao MySQL com sucesso!');
 
-    // Cria a tabela 'alunos'  caso ela não exista
+    // Cria a tabela 'usuario'  caso ela não exista
     const createTableQuery = `
-      CREATE TABLE IF NOT EXISTS alunos(
+      CREATE TABLE IF NOT EXISTS usuario(
         id INT AUTO_INCREMENT PRIMARY KEY,
-        nome VARCHAR(255) NOT NULL
+        nome VARCHAR(255) NOT NULL,
+        email VARCHAR(255) NOT NULL,
+        senha VARCHAR(40) NOT NULL,
+        confirmaSenha VARCHAR(40) NOT NULL
       )`;
       connection.query( createTableQuery, (err) => {
         if (err) {
@@ -42,14 +45,43 @@ connection.connect((err) => {
       } );
 });
 
-app.get('/alunos', (req, res) => {
-    connection.query('SELECT * FROM alunos', (err, results) => {
-        if (err) {
-            return res.status(500).json({ erro: 'Erro ao buscar alunos'});
+app.post('/cadastro', (req, res) => {
+
+    console.log('Chegou no servidor');
+    console.log(req.text);
+
+    const { nome, email, senha, confirmaSenha } = req.body;
+
+    const sql = `
+        INSERT INTO usuario (nome, email, senha, confirmaSenha)
+        VALUES (?, ?, ?, ?)
+    `;
+
+    connection.query(
+        sql,
+        [nome, email, senha, confirmaSenha],
+        (err, result) => {
+            if (err) {
+                console.error('Erro ao cadastrar usuario:', err);
+                return res.status(500).json({
+                    erro: 'Erro ao cadastrar usuario'
+                });
+            }
+
+            res.status(201).json({
+                mensagem: 'Usuario cadastrado com sucesso!',
+                id: result.insertId
+            });
         }
-        res.json(results);
-    });
+    );
 });
+
+
+
+
+
+
+
 
 app.listen(port, () => {
   console.log(`Servidor rodando em http://localhost':${port}/`);
