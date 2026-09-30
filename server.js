@@ -27,16 +27,19 @@ connection.connect((err) => {
       return;
     }
     console.log('Conectado ao MySQL com sucesso!');
-
-    // Cria a tabela 'usuario'  caso ela não exista
+    
     const createTableQuery = `
-      CREATE TABLE IF NOT EXISTS usuario(
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        nome VARCHAR(255) NOT NULL,
-        email VARCHAR(255) NOT NULL,
-        senha VARCHAR(40) NOT NULL,
-        confirmaSenha VARCHAR(40) NOT NULL
-      )`;
+        CREATE TABLE IF NOT EXISTS usuario (
+        id_usuario INT AUTO_INCREMENT PRIMARY KEY,
+        nome VARCHAR(100) NOT NULL,
+        email VARCHAR(100) NOT NULL,
+        senha_hash VARCHAR(255) NOT NULL,
+        data_nascimento DATE NOT NULL,
+        eh_maior_idade BOOLEAN NOT NULL,
+        tipo_perfil VARCHAR(50) NOT NULL,
+        participa_programa_fidelidade BOOLEAN NOT NULL,
+        data_cadastro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`;
       connection.query( createTableQuery, (err) => {
         if (err) {
           console.error('Erro ao criar tabela: ', err.stack );
@@ -48,23 +51,67 @@ connection.connect((err) => {
 app.post('/cadastro', (req, res) => {
 
     console.log('Chegou no servidor');
-    console.log(req.text);
+    console.log(req.body);
 
-    const { nome, email, senha, confirmaSenha } = req.body;
+    const {nome, email, data_nascimento, senha, confirmaSenha, participa_programa_fidelidade} = req.body;
+
+    if (senha !== confirmaSenha) {
+        return res.status(400).json({
+            erro: 'As senhas não coincidem'
+        });
+    }
+
+    const partesData = data_nascimento.split('/');
+
+    const dia = partesData[0];
+    const mes = partesData[1];
+    const ano = partesData[2];
+
+    const dataNascimento = new Date(`${ano}-${mes}-${dia}`);
+
+    const hoje = new Date();
+
+    let idade = hoje.getFullYear() - dataNascimento.getFullYear();
+
+    const mesAtual = hoje.getMonth();
+    const mesNascimento = dataNascimento.getMonth();
+
+    if (
+        mesAtual < mesNascimento ||
+        (mesAtual === mesNascimento && hoje.getDate() < dataNascimento.getDate())
+    ) {
+        idade--;
+    }
+
+    const ehMaiorIdade = idade >= 18;
+
+    const tipoPerfil = "cliente";
+
+    const dataNascimentoBanco = `${ano}-${mes}-${dia}`;
 
     const sql = `
-        INSERT INTO usuario (nome, email, senha, confirmaSenha)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO usuario (
+            nome,
+            email,
+            senha_hash,
+            data_nascimento,
+            eh_maior_idade,
+            tipo_perfil,
+            participa_programa_fidelidade
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
 
     connection.query(
         sql,
-        [nome, email, senha, confirmaSenha],
+        [nome, email, senha, dataNascimentoBanco, ehMaiorIdade, tipoPerfil, participa_programa_fidelidade],
         (err, result) => {
+
             if (err) {
-                console.error('Erro ao cadastrar usuario:', err);
+                console.error('ERRO DO MYSQL:', err);
+
                 return res.status(500).json({
-                    erro: 'Erro ao cadastrar usuario'
+                    erro: err.message
                 });
             }
 
@@ -76,9 +123,67 @@ app.post('/cadastro', (req, res) => {
     );
 });
 
+// app.post('/cadastro', (req, res) => {
 
+//     console.log('Chegou no servidor');
+//     console.log(req.text);
 
+//     const { nome, email, data_nascimento, senha, confirmaSenha, participa_programa_fidelidade } = req.body
 
+//     const sql = `
+//         INSERT INTO usuario (nome, email, senha_hash, data_nascimento, participa_programa_fidelidade)
+//         VALUES (?, ?, ?, ?, ?)
+//     `;
+
+//     connection.query(
+//     sql,
+//     [nome, email, senha, data_nascimento, participa_programa_fidelidade],
+//     (err, result) => {
+//             if (err) {
+//                 console.error('ERRO DO MYSQL:', err);
+//                 return res.status(500).json({
+//                 erro: err.message
+//             });
+//         }
+
+//         res.status(201).json({
+//             mensagem: 'Usuario cadastrado com sucesso!',
+//             id: result.insertId
+//             });
+//         }
+//     );
+// });
+
+// app.post('/login', (req, res) => {
+
+//     console.log('Chegou no servidor o login');
+//     console.log(req.text);
+
+//     const { email, senha } = req.body;
+
+//     const sql = `
+//         INSERT INTO usuario (email, senha)
+//         VALUES (?, ?, ?, ?)
+//     `;
+
+//     connection.query(
+//         sql,
+//         [email, senha],
+//         (err, result) => {
+//             if (err) {
+//                 console.error('Erro ao cadastrar usuario:', err);
+//                 return res.status(500).json({
+//                     erro: 'Erro ao cadastrar usuario'
+//                 });
+//             }
+
+//             res.status(201).json({
+//                 mensagem: 'Usuario cadastrado com sucesso!',
+//                 id: result.insertId
+//             });
+//         }
+//     );
+// });
 
 
 
