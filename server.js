@@ -48,6 +48,7 @@ connection.connect((err) => {
       } );
 });
 
+// Aqui começa o Cadastro (criar conta)
 app.post('/cadastro', async (req, res) => {
 
     console.log('Chegou no servidor');
@@ -77,9 +78,8 @@ app.post('/cadastro', async (req, res) => {
     const mesNascimento = dataNascimento.getMonth();
 
     if (
-        mesAtual < mesNascimento ||
-        (mesAtual === mesNascimento && hoje.getDate() < dataNascimento.getDate())
-    ) {
+        mesAtual < mesNascimento || (mesAtual === mesNascimento && hoje.getDate() < dataNascimento.getDate())) 
+    {
         idade--;
     }
 
@@ -125,68 +125,64 @@ app.post('/cadastro', async (req, res) => {
     );
 });
 
-// app.post('/cadastro', (req, res) => {
-
-//     console.log('Chegou no servidor');
-//     console.log(req.text);
-
-//     const { nome, email, data_nascimento, senha, confirmaSenha, participa_programa_fidelidade } = req.body
-
-//     const sql = `
-//         INSERT INTO usuario (nome, email, senha_hash, data_nascimento, participa_programa_fidelidade)
-//         VALUES (?, ?, ?, ?, ?)
-//     `;
-
-//     connection.query(
-//     sql,
-//     [nome, email, senha, data_nascimento, participa_programa_fidelidade],
-//     (err, result) => {
-//             if (err) {
-//                 console.error('ERRO DO MYSQL:', err);
-//                 return res.status(500).json({
-//                 erro: err.message
-//             });
-//         }
-
-//         res.status(201).json({
-//             mensagem: 'Usuario cadastrado com sucesso!',
-//             id: result.insertId
-//             });
-//         }
-//     );
-// });
-
-// app.post('/login', (req, res) => {
-
-//     console.log('Chegou no servidor o login');
-//     console.log(req.text);
-
-//     const { email, senha } = req.body;
-
-//     const sql = `
-//         INSERT INTO usuario (email, senha)
-//         VALUES (?, ?, ?, ?)
-//     `;
-
-//     connection.query(
-//         sql,
-//         [email, senha],
-//         (err, result) => {
-//             if (err) {
-//                 console.error('Erro ao cadastrar usuario:', err);
-//                 return res.status(500).json({
-//                     erro: 'Erro ao cadastrar usuario'
-//                 });
-//             }
-
-//             res.status(201).json({
-//                 mensagem: 'Usuario cadastrado com sucesso!',
-//                 id: result.insertId
-//             });
-//         }
-//     );
-// });
-
+// Aqui começa o Login / Autenticação (ou Entrar)
 app.listen(port, () => {
   console.log(`Servidor rodando em http://localhost':${port}/`);
+});
+
+app.post('/login', async (req, res) => {
+
+    console.log('Chegou no servidor o login');
+    console.log(req.body);
+
+    const { email, senha } = req.body;
+
+    const sql = `
+        SELECT *
+        FROM usuario
+        WHERE email = ?
+    `;
+
+    connection.query(
+        sql,
+        [email],
+        async (err, results) => {
+
+            if (err) {
+                console.error('ERRO DO MYSQL:', err);
+                return res.status(500).json({
+                    erro: err.message
+                });
+            }
+
+            if (results.length === 0) {
+                return res.status(401).json({
+                    erro: 'E-mail ou senha incorretos'
+                });
+            }
+
+            const usuario = results[0];
+
+            const senhaCorreta = await bcrypt.compare(
+                senha,
+                usuario.senha_hash
+            );
+
+            if (!senhaCorreta) {
+                return res.status(401).json({
+                    erro: 'E-mail ou senha incorretos'
+                });
+            }
+
+            res.status(200).json({
+                mensagem: 'Login realizado com sucesso!',
+                usuario: {
+                    id_usuario: usuario.id_usuario,
+                    nome: usuario.nome,
+                    email: usuario.email,
+                    tipo_perfil: usuario.tipo_perfil
+                }
+            });
+        }
+    );
 });
