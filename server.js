@@ -125,7 +125,7 @@ app.post('/cadastro', async (req, res) => {
     );
 });
 
-// Aqui começa o Login / Autenticação (ou Entrar)
+// Aqui começa o Login / Autenticação (ou Entrar) asdasdasdasda
 app.listen(port, () => {
   console.log(`Servidor rodando em http://localhost':${port}/`);
 });
