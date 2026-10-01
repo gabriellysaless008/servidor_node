@@ -1,7 +1,7 @@
 const express = require('express');
 const mysql = require('mysql2');
-
 const cors = require('cors');
+const bcrypt = require('bcrypt');
 
 const app = express();
 const port = 3000;
@@ -48,7 +48,7 @@ connection.connect((err) => {
       } );
 });
 
-app.post('/cadastro', (req, res) => {
+app.post('/cadastro', async (req, res) => {
 
     console.log('Chegou no servidor');
     console.log(req.body);
@@ -89,22 +89,24 @@ app.post('/cadastro', (req, res) => {
 
     const dataNascimentoBanco = `${ano}-${mes}-${dia}`;
 
+    const senhaHash = await bcrypt.hash(senha, 10);
+
     const sql = `
         INSERT INTO usuario (
-            nome,
-            email,
-            senha_hash,
-            data_nascimento,
-            eh_maior_idade,
-            tipo_perfil,
-            participa_programa_fidelidade
+        nome,
+        email,
+        senha_hash,
+        data_nascimento,
+        eh_maior_idade,
+        tipo_perfil,
+        participa_programa_fidelidade
         )
         VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
 
     connection.query(
         sql,
-        [nome, email, senha, dataNascimentoBanco, ehMaiorIdade, tipoPerfil, participa_programa_fidelidade],
+        [nome, email, senhaHash, dataNascimentoBanco, ehMaiorIdade, tipoPerfil, participa_programa_fidelidade],
         (err, result) => {
 
             if (err) {
@@ -184,9 +186,6 @@ app.post('/cadastro', (req, res) => {
 //         }
 //     );
 // });
-
-
-
 
 app.listen(port, () => {
   console.log(`Servidor rodando em http://localhost':${port}/`);
