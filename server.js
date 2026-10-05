@@ -125,6 +125,46 @@ app.post('/cadastro', async (req, res) => {
     );
 });
 
+app.put('/usuario/:id/onboarding', (req, res) => {
+
+    const idUsuario = req.params.id;
+
+    const sql = `
+        UPDATE usuario
+        SET onboarding_concluido = TRUE
+        WHERE id_usuario = ?
+    `;
+
+    connection.query(
+        sql,
+        [idUsuario],
+        (err, result) => {
+
+            if (err) {
+                console.error(
+                    "ERRO AO ATUALIZAR ONBOARDING:",
+                    err
+                );
+
+                return res.status(500).json({
+                    erro: "Erro ao concluir onboarding."
+                });
+            }
+
+            if (result.affectedRows === 0) {
+                return res.status(404).json({
+                    erro: "Usuário não encontrado."
+                });
+            }
+
+            res.status(200).json({
+                mensagem: "Onboarding concluído com sucesso!"
+            });
+        }
+    );
+});
+
+
 // Aqui começa o Login / Autenticação (ou Entrar)
 app.listen(port, () => {
   console.log(`Servidor rodando em http://localhost':${port}/`);
@@ -173,14 +213,15 @@ app.post('/login', async (req, res) => {
                     erro: 'E-mail ou senha incorretos'
                 });
             }
-
+            
             res.status(200).json({
                 mensagem: 'Login realizado com sucesso!',
                 usuario: {
                     id_usuario: usuario.id_usuario,
                     nome: usuario.nome,
                     email: usuario.email,
-                    tipo_perfil: usuario.tipo_perfil
+                    tipo_perfil: usuario.tipo_perfil,
+                    onboarding_concluido: usuario.onboarding_concluido
                 }
             });
         }
