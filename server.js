@@ -61,6 +61,13 @@ app.post('/cadastro', async (req, res) => {
             erro: 'As senhas não coincidem'
         });
     }
+    const [usuariosExistentes] = await connection.promise().query("SELECT id_usuario FROM usuario WHERE email = ?", [email.trim()]);
+
+    if (usuariosExistentes.length > 0) {
+        return res.status(409).json({
+        erro: "Este e-mail já está cadastrado. Tente fazer login."
+        });
+    }
 
     const partesData = data_nascimento.split('/');
 
