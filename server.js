@@ -109,6 +109,35 @@ connection.connect((err) => {
         console.log('Tabela produto verificada/criada com sucesso!');
     } );
 
+    
+    const createPedidoQuery = `
+        CREATE TABLE IF NOT EXISTS Pedido (
+            id_pedido INT AUTO_INCREMENT PRIMARY KEY,
+            id_comprador INT NOT NULL,
+            codigo_moeda_utilizada VARCHAR(3) NOT NULL,
+            valor_subtotal DECIMAL(10,2) NOT NULL,
+            valor_frete DECIMAL(10,2) NOT NULL,
+            isento_frete BOOLEAN,
+            cep_destino VARCHAR(9) NOT NULL,
+            regiao_metropolitana BOOLEAN,
+            status VARCHAR(50) NOT NULL,
+            data_pedido TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+        CONSTRAINT fk_pedido_comprador
+            FOREIGN KEY (id_comprador)
+            REFERENCES usuario(id_usuario)
+    )`;
+
+connection.query(createPedidoQuery, (err) => {
+    if (err) {
+        console.error('Erro ao criar tabela Pedido:', err);
+        return;
+    }
+
+    console.log('Tabela Pedido verificada/criada com sucesso!');
+});
+
+
 });
 
 // Aqui começa o Cadastro (criar conta)
