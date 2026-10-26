@@ -2,15 +2,41 @@ const express = require('express');
 const mysql = require('mysql2');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
+const session = require('express-session');
 
 const app = express();
 const port = 3000;
 
-// Use o cors
-app.use(cors());
+app.use(cors({
+    origin: true,
+    credentials: true
+}));
 
-// Middleware(ponte) para o Express entender JSON no corpo da requisição (req.body)
 app.use(express.json());
+
+app.use(session({
+    secret: 'vest-shop-chave-temporaria',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        httpOnly: true,
+        secure: false,
+        sameSite: 'lax'
+    }
+}));
+
+function autorizarEdicaoInventario(req, res, next) {
+    const perfisAutorizados = [ "atendente", "gerente", "administrador" ];
+    const tipoPerfil = req.usuario?.tipo_perfil;
+
+    if (!perfisAutorizados.includes(tipoPerfil)) {
+        return res.status(403).json({
+            erro: "Você não tem permissão para alterar o inventário."
+        });
+    }
+
+    next();
+}
 
 // 1. Configura a conexão com o MySQL
 const connection = mysql.createConnection({
