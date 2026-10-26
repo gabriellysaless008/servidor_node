@@ -25,6 +25,13 @@ app.use(session({
     }
 }));
 
+function carregarUsuario(req, res, next) {
+    req.usuario = req.session.usuario || null;
+    next();
+}
+
+app.use(carregarUsuario);
+
 function autorizarEdicaoInventario(req, res, next) {
     const perfisAutorizados = [ "atendente", "gerente", "administrador" ];
     const tipoPerfil = req.usuario?.tipo_perfil;
@@ -72,6 +79,36 @@ connection.connect((err) => {
           return;
         }
       } );
+
+      
+    const createProdutoQuery = `
+        CREATE TABLE IF NOT EXISTS produto (
+            id_produto INT AUTO_INCREMENT PRIMARY KEY,
+            id_anunciante INT NOT NULL,
+            nome VARCHAR(150) NOT NULL,
+            marca VARCHAR(100) NOT NULL,
+            descricao TEXT,
+            tamanho VARCHAR(10) NOT NULL,
+            genero_indicado VARCHAR(20),
+            estilo VARCHAR(50) NOT NULL,
+            preco_base_brl DECIMAL(10,2) NOT NULL,
+            quantidade_estoque INT NOT NULL,
+            status VARCHAR(50) NOT NULL,
+            data_cadastro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+            CONSTRAINT fk_produto_anunciante
+                FOREIGN KEY (id_anunciante)
+                REFERENCES usuario(id_usuario)
+        )`;
+
+    connection.query(createProdutoQuery, (err) => {
+        if (err) {
+            console.error('Erro ao criar tabela produto:', err);
+            return;
+        }
+        console.log('Tabela produto verificada/criada com sucesso!');
+    } );
+
 });
 
 // Aqui começa o Cadastro (criar conta)
@@ -246,6 +283,8 @@ app.post('/login', async (req, res) => {
                     erro: 'E-mail ou senha incorretos'
                 });
             }
+
+            req.session.usuario = { id_usuario: usuario.id_usuario, nome: usuario.nome, email: usuario.email, tipo_perfil: usuario.tipo_perfil };
             
             res.status(200).json({
                 mensagem: 'Login realizado com sucesso!',
