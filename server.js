@@ -278,6 +278,26 @@ app.put('/usuario/:id/onboarding', (req, res) => {
 
 // Aqui começa a implementação do RFN 01.01
 
+// Listar produtos do inventário
+app.get('/produtos', async (req, res) => {
+    const sql = `
+        SELECT *
+        FROM produto
+        ORDER BY id_produto DESC
+    `;
+
+    try {
+        const [produtos] = await connection.promise().query(sql);
+        res.status(200).json(produtos);
+    } catch (erro) {
+        console.error("ERRO AO LISTAR PRODUTOS:", erro);
+
+        res.status(500).json({
+            erro: "Não foi possível carregar os produtos."
+        });
+    }
+});
+
 // Cadastrar produto
 app.post('/produtos', autorizarEdicaoInventario, async (req, res) => {
 
