@@ -33,8 +33,15 @@ function carregarUsuario(req, res, next) {
 app.use(carregarUsuario);
 
 function autorizarEdicaoInventario(req, res, next) {
-    const perfisAutorizados = [ "atendente", "gerente", "administrador" ];
-    const tipoPerfil = req.usuario?.tipo_perfil;
+
+    if (!req.usuario) {
+        return res.status(401).json({
+            erro: "Faça login para alterar o inventário."
+        });
+    }
+
+    const perfisAutorizados = ["atendente", "gerente", "administrador"];
+    const tipoPerfil = req.usuario.tipo_perfil;
 
     if (!perfisAutorizados.includes(tipoPerfil)) {
         return res.status(403).json({
@@ -44,6 +51,8 @@ function autorizarEdicaoInventario(req, res, next) {
 
     next();
 }
+
+
 
 // 1. Configura a conexão com o MySQL
 const connection = mysql.createConnection({
@@ -56,11 +65,11 @@ const connection = mysql.createConnection({
 // Conecta ao banco de dados
 connection.connect((err) => {
     if (err) {
-      console.error('Erro ao conectar ao MySQL: ', err.stack );
-      return;
+        console.error('Erro ao conectar ao MySQL: ', err.stack);
+        return;
     }
     console.log('Conectado ao MySQL com sucesso!');
-    
+
     const createTableQuery = `
         CREATE TABLE IF NOT EXISTS usuario (
         id_usuario INT AUTO_INCREMENT PRIMARY KEY,
@@ -71,16 +80,17 @@ connection.connect((err) => {
         eh_maior_idade BOOLEAN NOT NULL,
         tipo_perfil VARCHAR(50) NOT NULL,
         participa_programa_fidelidade BOOLEAN NOT NULL,
+        onboarding_concluido BOOLEAN NOT NULL DEFAULT FALSE,
         data_cadastro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`;
-      connection.query( createTableQuery, (err) => {
+    connection.query(createTableQuery, (err) => {
         if (err) {
-          console.error('Erro ao criar tabela: ', err.stack );
-          return;
+            console.error('Erro ao criar tabela: ', err.stack);
+            return;
         }
-      } );
+    });
 
-      
+
     const createProdutoQuery = `
         CREATE TABLE IF NOT EXISTS produto (
             id_produto INT AUTO_INCREMENT PRIMARY KEY,
@@ -107,9 +117,9 @@ connection.connect((err) => {
             return;
         }
         console.log('Tabela produto verificada/criada com sucesso!');
-    } );
+    });
 
-    
+
     const createPedidoQuery = `
         CREATE TABLE IF NOT EXISTS Pedido (
             id_pedido INT AUTO_INCREMENT PRIMARY KEY,
@@ -128,14 +138,14 @@ connection.connect((err) => {
             REFERENCES usuario(id_usuario)
     )`;
 
-connection.query(createPedidoQuery, (err) => {
-    if (err) {
-        console.error('Erro ao criar tabela Pedido:', err);
-        return;
-    }
+    connection.query(createPedidoQuery, (err) => {
+        if (err) {
+            console.error('Erro ao criar tabela Pedido:', err);
+            return;
+        }
 
-    console.log('Tabela Pedido verificada/criada com sucesso!');
-});
+        console.log('Tabela Pedido verificada/criada com sucesso!');
+    });
 
 
 });
@@ -144,9 +154,8 @@ connection.query(createPedidoQuery, (err) => {
 app.post('/cadastro', async (req, res) => {
 
     console.log('Chegou no servidor');
-    console.log(req.body);
 
-    const {nome, email, data_nascimento, senha, confirmaSenha, participa_programa_fidelidade} = req.body;
+    const { nome, email, data_nascimento, senha, confirmaSenha, participa_programa_fidelidade } = req.body;
 
     if (senha !== confirmaSenha) {
         return res.status(400).json({
@@ -157,7 +166,7 @@ app.post('/cadastro', async (req, res) => {
 
     if (usuariosExistentes.length > 0) {
         return res.status(409).json({
-        erro: "Este e-mail já está cadastrado. Tente fazer login."
+            erro: "Este e-mail já está cadastrado. Tente fazer login."
         });
     }
 
@@ -177,8 +186,7 @@ app.post('/cadastro', async (req, res) => {
     const mesNascimento = dataNascimento.getMonth();
 
     if (
-        mesAtual < mesNascimento || (mesAtual === mesNascimento && hoje.getDate() < dataNascimento.getDate())) 
-    {
+        mesAtual < mesNascimento || (mesAtual === mesNascimento && hoje.getDate() < dataNascimento.getDate())) {
         idade--;
     }
 
@@ -225,8 +233,21 @@ app.post('/cadastro', async (req, res) => {
 });
 
 app.put('/usuario/:id/onboarding', (req, res) => {
+    const usuarioLogado = req.usuario;
 
-    const idUsuario = req.params.id;
+    if (!usuarioLogado) {
+        return res.status(401).json({
+            erro: 'Faça login para concluir o onboarding.'
+        });
+    }
+
+    const idUsuario = Number(req.params.id);
+
+    if (!Number.isInteger(idUsuario) || idUsuario !== usuarioLogado.id_usuario) {
+        return res.status(403).json({
+            erro: 'Você não pode alterar o onboarding de outra conta.'
+        });
+    }
 
     const sql = `
         UPDATE usuario
@@ -234,45 +255,265 @@ app.put('/usuario/:id/onboarding', (req, res) => {
         WHERE id_usuario = ?
     `;
 
-    connection.query(
-        sql,
-        [idUsuario],
-        (err, result) => {
+    connection.query(sql, [idUsuario], (err, result) => {
+        if (err) {
+            console.error('Erro ao atualizar onboarding:', err);
 
-            if (err) {
-                console.error(
-                    "ERRO AO ATUALIZAR ONBOARDING:",
-                    err
-                );
-
-                return res.status(500).json({
-                    erro: "Erro ao concluir onboarding."
-                });
-            }
-
-            if (result.affectedRows === 0) {
-                return res.status(404).json({
-                    erro: "Usuário não encontrado."
-                });
-            }
-
-            res.status(200).json({
-                mensagem: "Onboarding concluído com sucesso!"
+            return res.status(500).json({
+                erro: 'Erro ao concluir onboarding.'
             });
         }
-    );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({
+                erro: 'Usuário não encontrado.'
+            });
+        }
+
+        return res.status(200).json({
+            mensagem: 'Onboarding concluído com sucesso!'
+        });
+    });
+});
+
+// Aqui começa a implementação do RFN 01.01
+
+// Cadastrar produto
+app.post('/produtos', autorizarEdicaoInventario, async (req, res) => {
+
+    const {
+        nome,
+        marca,
+        descricao,
+        tamanho,
+        genero_indicado,
+        estilo,
+        preco_base_brl,
+        quantidade_estoque,
+        status
+    } = req.body;
+
+    if (!nome || !marca || !tamanho || !estilo || preco_base_brl == null || quantidade_estoque == null || !status) {
+        return res.status(400).json({
+            erro: "Preencha os campos obrigatórios do produto."
+        });
+    }
+
+    const preco = Number(preco_base_brl);
+    const quantidade = Number(quantidade_estoque);
+
+    if (!Number.isFinite(preco) || preco < 0 || !Number.isInteger(quantidade) || quantidade < 0) {
+        return res.status(400).json({
+            erro: "Preço ou quantidade inválidos."
+        });
+    }
+
+    const sql = `
+        INSERT INTO produto (
+            id_anunciante,
+            nome,
+            marca,
+            descricao,
+            tamanho,
+            genero_indicado,
+            estilo,
+            preco_base_brl,
+            quantidade_estoque,
+            status
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+
+    try {
+
+        const [resultado] = await connection.promise().query(
+            sql,
+            [
+                req.usuario.id_usuario,
+                nome,
+                marca,
+                descricao || null,
+                tamanho,
+                genero_indicado || null,
+                estilo,
+                preco,
+                quantidade,
+                status
+            ]
+        );
+
+        res.status(201).json({
+            mensagem: "Produto cadastrado com sucesso!",
+            id_produto: resultado.insertId
+        });
+
+    } catch (erro) {
+
+        console.error("ERRO AO CADASTRAR PRODUTO:", erro);
+
+        res.status(500).json({
+            erro: "Não foi possível cadastrar o produto."
+        });
+    }
 });
 
 
+// Editar produto
+app.put('/produtos/:id', autorizarEdicaoInventario, async (req, res) => {
+
+    const idProduto = Number(req.params.id);
+
+    if (!Number.isInteger(idProduto) || idProduto <= 0) {
+        return res.status(400).json({
+            erro: "ID de produto inválido."
+        });
+    }
+
+    const {
+        nome,
+        marca,
+        descricao,
+        tamanho,
+        genero_indicado,
+        estilo,
+        preco_base_brl,
+        quantidade_estoque,
+        status
+    } = req.body;
+
+    if (!nome || !marca || !tamanho || !estilo || preco_base_brl == null || quantidade_estoque == null || !status) {
+        return res.status(400).json({
+            erro: "Preencha os campos obrigatórios do produto."
+        });
+    }
+
+    const preco = Number(preco_base_brl);
+    const quantidade = Number(quantidade_estoque);
+
+    if (!Number.isFinite(preco) || preco < 0 || !Number.isInteger(quantidade) || quantidade < 0) {
+        return res.status(400).json({
+            erro: "Preço ou quantidade inválidos."
+        });
+    }
+
+    const sql = `
+        UPDATE produto
+        SET nome = ?,
+            marca = ?,
+            descricao = ?,
+            tamanho = ?,
+            genero_indicado = ?,
+            estilo = ?,
+            preco_base_brl = ?,
+            quantidade_estoque = ?,
+            status = ?
+        WHERE id_produto = ?
+    `;
+
+    try {
+
+        const [resultado] = await connection.promise().query(
+            sql,
+            [
+                nome,
+                marca,
+                descricao || null,
+                tamanho,
+                genero_indicado || null,
+                estilo,
+                preco,
+                quantidade,
+                status,
+                idProduto
+            ]
+        );
+
+        if (resultado.affectedRows === 0) {
+
+            const [produtos] = await connection.promise().query("SELECT id_produto FROM produto WHERE id_produto = ?", [idProduto]);
+
+            if (produtos.length === 0) {
+                return res.status(404).json({
+                    erro: "Produto não encontrado."
+                });
+            }
+        }
+
+        res.status(200).json({
+            mensagem: "Produto atualizado com sucesso!"
+        });
+
+    } catch (erro) {
+
+        console.error("ERRO AO EDITAR PRODUTO:", erro);
+
+        res.status(500).json({
+            erro: "Não foi possível atualizar o produto."
+        });
+    }
+});
+
+
+// Desativar produto do inventário
+app.delete('/produtos/:id', autorizarEdicaoInventario, async (req, res) => {
+
+    const idProduto = Number(req.params.id);
+
+    if (!Number.isInteger(idProduto) || idProduto <= 0) {
+        return res.status(400).json({
+            erro: "ID de produto inválido."
+        });
+    }
+
+    const sql = `
+        UPDATE produto
+        SET status = 'inativo'
+        WHERE id_produto = ?
+    `;
+
+    try {
+
+        const [resultado] = await connection.promise().query(
+            sql,
+            [idProduto]
+        );
+
+        if (resultado.affectedRows === 0) {
+
+            const [produtos] = await connection.promise().query(
+                "SELECT id_produto FROM produto WHERE id_produto = ?",
+                [idProduto]
+            );
+
+            if (produtos.length === 0) {
+                return res.status(404).json({
+                    erro: "Produto não encontrado."
+                });
+            }
+        }
+
+        res.status(200).json({
+            mensagem: "Produto desativado com sucesso!"
+        });
+
+    } catch (erro) {
+
+        console.error("ERRO AO DESATIVAR PRODUTO:", erro);
+
+        res.status(500).json({
+            erro: "Não foi possível desativar o produto."
+        });
+    }
+});
+
 // Aqui começa o Login / Autenticação (ou Entrar)
 app.listen(port, () => {
-  console.log(`Servidor rodando em http://localhost':${port}/`);
+    console.log(`Servidor rodando em http://localhost':${port}/`);
 });
 
 app.post('/login', async (req, res) => {
 
     console.log('Chegou no servidor o login');
-    console.log(req.body);
 
     const { email, senha } = req.body;
 
@@ -313,17 +554,34 @@ app.post('/login', async (req, res) => {
                 });
             }
 
-            req.session.usuario = { id_usuario: usuario.id_usuario, nome: usuario.nome, email: usuario.email, tipo_perfil: usuario.tipo_perfil };
-            
-            res.status(200).json({
-                mensagem: 'Login realizado com sucesso!',
-                usuario: {
-                    id_usuario: usuario.id_usuario,
-                    nome: usuario.nome,
-                    email: usuario.email,
-                    tipo_perfil: usuario.tipo_perfil,
-                    onboarding_concluido: usuario.onboarding_concluido
+
+            req.session.usuario = {
+                id_usuario: usuario.id_usuario,
+                nome: usuario.nome,
+                email: usuario.email,
+                tipo_perfil: usuario.tipo_perfil
+            };
+
+            req.session.save((erroSessao) => {
+
+                if (erroSessao) {
+                    console.error('ERRO AO SALVAR SESSÃO:', erroSessao);
+
+                    return res.status(500).json({
+                        erro: 'Não foi possível iniciar a sessão.'
+                    });
                 }
+
+                res.status(200).json({
+                    mensagem: 'Login realizado com sucesso!',
+                    usuario: {
+                        id_usuario: usuario.id_usuario,
+                        nome: usuario.nome,
+                        email: usuario.email,
+                        tipo_perfil: usuario.tipo_perfil,
+                        onboarding_concluido: usuario.onboarding_concluido
+                    }
+                });
             });
         }
     );
