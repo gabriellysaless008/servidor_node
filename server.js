@@ -52,8 +52,6 @@ function autorizarEdicaoInventario(req, res, next) {
     next();
 }
 
-
-
 // 1. Configura a conexão com o MySQL
 const connection = mysql.createConnection({
     host: 'localhost',
@@ -131,7 +129,7 @@ connection.connect((err) => {
             cep_destino VARCHAR(9) NOT NULL,
             regiao_metropolitana BOOLEAN,
             status VARCHAR(50) NOT NULL,
-            data_pedido TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            data_pedido TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 
         CONSTRAINT fk_pedido_comprador
             FOREIGN KEY (id_comprador)
