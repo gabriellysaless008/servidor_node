@@ -6,10 +6,158 @@ const bcrypt = require('bcrypt');
 module.exports = (connection) => {
 const router = express.Router();
 
-// CADASTRO DE USUÁRIO
-router.post('/cadastro', async (req, res) => {
 
-    console.log('Chegou no servidor o cadastro');
+    // CADASTRAR CLIENTE
+
+    router.post('/cadastro', async (req, res) => {
+
+        console.log('Chegou no servidor');
+
+        const {
+            nome,
+            email,
+            data_nascimento,
+            senha,
+            confirmaSenha,
+            participa_programa_fidelidade
+        } = req.body;
+
+        try {
+
+            if (!nome || !email || !data_nascimento || !senha || !confirmaSenha) {
+                return res.status(400).json({
+                    erro: 'Preencha todos os campos obrigatórios.'
+                });
+            }
+
+            if (senha !== confirmaSenha) {
+                return res.status(400).json({
+                    erro: 'As senhas não coincidem.'
+                });
+            }
+
+            // Verifica se o e-mail já está cadastrado
+            const [usuariosExistentes] = await connection.promise().query(
+                `SELECT id_usuario
+                 FROM usuario
+                 WHERE email = ?`,
+                [email.trim()]
+            );
+
+            if (usuariosExistentes.length > 0) {
+                return res.status(409).json({
+                    erro: 'Este e-mail já está cadastrado. Tente fazer login.'
+                });
+            }
+
+            // Converte a data de nascimento
+            const partesData = data_nascimento.split('/');
+
+            if (partesData.length !== 3) {
+                return res.status(400).json({
+                    erro: 'Informe uma data de nascimento válida.'
+                });
+            }
+
+            const dia = Number(partesData[0]);
+            const mes = Number(partesData[1]);
+            const ano = Number(partesData[2]);
+
+            const dataNascimento = new Date(ano, mes - 1, dia);
+
+            if (
+                dataNascimento.getFullYear() !== ano ||
+                dataNascimento.getMonth() !== mes - 1 ||
+                dataNascimento.getDate() !== dia
+            ) {
+                return res.status(400).json({
+                    erro: 'Informe uma data de nascimento válida.'
+                });
+            }
+
+            // Calcula a idade
+            const hoje = new Date();
+
+            let idade = hoje.getFullYear() - ano;
+
+            if (
+                hoje.getMonth() < mes - 1 ||
+                (hoje.getMonth() === mes - 1 && hoje.getDate() < dia)
+            ) {
+                idade--;
+            }
+
+            const ehMaiorIdade = idade >= 18;
+
+            const dataNascimentoBanco =
+                `${ano}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+
+            // Cadastro público será sempre de cliente
+            const tipoPerfil = 'cliente';
+
+            // Criptografa a senha
+            const senhaHash = await bcrypt.hash(senha, 10);
+
+            const sql = `
+                INSERT INTO usuario (
+                    nome,
+                    email,
+                    senha_hash,
+                    data_nascimento,
+                    eh_maior_idade,
+                    tipo_perfil,
+                    participa_programa_fidelidade
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            `;
+
+            const [resultado] = await connection.promise().query(
+                sql,
+                [
+                    nome,
+                    email.trim(),
+                    senhaHash,
+                    dataNascimentoBanco,
+                    ehMaiorIdade,
+                    tipoPerfil,
+                    Boolean(participa_programa_fidelidade)
+                ]
+            );
+
+            return res.status(201).json({
+                mensagem: 'Usuario cadastrado com sucesso!',
+                id: resultado.insertId
+            });
+
+        } catch (erro) {
+
+            console.error('ERRO AO CADASTRAR USUÁRIO:', erro);
+
+            return res.status(500).json({
+                erro: 'Não foi possível realizar o cadastro.'
+            });
+        }
+    });
+
+
+
+// CADASTRAR ATENDENTE OU GERENTE
+
+router.post('/usuarios/equipe', async (req, res) => {
+
+    // Verifica se existe um usuário logado
+    if (!req.usuario) {
+        return res.status(401).json({
+            erro: 'Faça login para cadastrar usuários da equipe.'
+        });
+    }
+
+    // Somente Administradores podem cadastrar a equipe
+    if (req.usuario.tipo_perfil !== 'administrador') {
+        return res.status(403).json({
+            erro: 'Somente Administradores podem cadastrar usuários da equipe.'
+        });
+    }
 
     const {
         nome,
@@ -17,28 +165,49 @@ router.post('/cadastro', async (req, res) => {
         data_nascimento,
         senha,
         confirmaSenha,
-        participa_programa_fidelidade
+        tipo_perfil
     } = req.body;
 
     try {
 
-        if (senha !== confirmaSenha) {
+    // Verifica os campos obrigatórios
+        if (!nome || !email || !data_nascimento || !senha || !confirmaSenha || !tipo_perfil) {
             return res.status(400).json({
-                erro: 'As senhas não coincidem'
+                erro: 'Preencha todos os campos obrigatórios.'
             });
         }
 
-// Verifica se o e-mail já está cadastrado
-    const [usuariosExistentes] = await connection.promise().query("SELECT id_usuario FROM usuario WHERE email = ?", [email.trim()]);
+    // Permite somente os perfis de Atendente e Gerente
+        const perfisPermitidos = ['atendente', 'gerente'];
+
+        if (!perfisPermitidos.includes(tipo_perfil)) {
+            return res.status(400).json({
+                erro: 'Perfil inválido. Escolha Atendente ou Gerente.'
+            });
+        }
+
+    // Verifica se as senhas coincidem
+        if (senha !== confirmaSenha) {
+            return res.status(400).json({
+                erro: 'As senhas não coincidem.'
+            });
+        }
+
+    // Verifica se o e-mail já está cadastrado
+        const [usuariosExistentes] = await connection.promise().query(
+            `SELECT id_usuario
+            FROM usuario
+            WHERE email = ?`,
+            [email.trim()]);
 
         if (usuariosExistentes.length > 0) {
             return res.status(409).json({
-                erro: "Este e-mail já está cadastrado. Tente fazer login."
+                erro: 'Este e-mail já está cadastrado.'
             });
         }
 
     // Converte a data de nascimento
-    const partesData = data_nascimento.split('/');
+        const partesData = data_nascimento.split('/');
 
         if (partesData.length !== 3) {
             return res.status(400).json({
@@ -57,7 +226,7 @@ router.post('/cadastro', async (req, res) => {
                 erro: 'Informe uma data de nascimento válida.'
             });
         }
-    
+
         // Calcula a idade
         const hoje = new Date();
 
@@ -69,16 +238,12 @@ router.post('/cadastro', async (req, res) => {
 
         const ehMaiorIdade = idade >= 18;
 
-        // Cadastro público cria somente clientes
-        const tipoPerfil = "cliente";
-
         const dataNascimentoBanco = `${ano}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
-
-        const participaFidelidade = participa_programa_fidelidade === true || participa_programa_fidelidade === 1 || participa_programa_fidelidade === 'true' || participa_programa_fidelidade === '1';
 
         // Criptografa a senha
         const senhaHash = await bcrypt.hash(senha, 10);
 
+        // Insere o usuário no banco
         const sql = `
             INSERT INTO usuario (
                 nome,
@@ -92,30 +257,32 @@ router.post('/cadastro', async (req, res) => {
             VALUES (?, ?, ?, ?, ?, ?, ?)`;
 
         const [resultado] = await connection.promise().query(
-            sql, [
+            sql,
+            [
                 nome,
                 email.trim(),
                 senhaHash,
                 dataNascimentoBanco,
                 ehMaiorIdade,
-                tipoPerfil,
-                participaFidelidade
+                tipo_perfil,
+                false
             ]);
 
         return res.status(201).json({
-            mensagem: 'Usuario cadastrado com sucesso!',
-            id: resultado.insertId
+            mensagem: 'Usuário da equipe cadastrado com sucesso!',
+            id_usuario: resultado.insertId,
+            tipo_perfil: tipo_perfil
         });
 
-        } catch (erro) {
+    } catch (erro) {
 
-        console.error('ERRO AO CADASTRAR USUÁRIO:', erro);
+        console.error('ERRO AO CADASTRAR USUÁRIO DA EQUIPE:', erro);
 
         return res.status(500).json({
-            erro: 'Não foi possível realizar o cadastro.'
-            });
-        }
-    });
+            erro: 'Não foi possível cadastrar o usuário da equipe.'
+        });
+    }
+});
 
 
 // CONCLUSÃO DO ONBOARDING
