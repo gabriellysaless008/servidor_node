@@ -133,9 +133,9 @@ connection.connect((err) => {
                     status VARCHAR(50) NOT NULL,
                     data_pedido TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-                    CONSTRAINT fk_pedido_comprador
-                        FOREIGN KEY (id_comprador)
-                        REFERENCES usuario(id_usuario)
+                CONSTRAINT fk_pedido_comprador
+                    FOREIGN KEY (id_comprador)
+                    REFERENCES usuario(id_usuario)
                 )`;
 
             connection.query(createPedidoQuery, (err) => {
@@ -154,13 +154,13 @@ connection.connect((err) => {
                         quantidade INT NOT NULL,
                         preco_unitario_moeda_local DECIMAL(10,2) NOT NULL,
 
-                        CONSTRAINT fk_item_pedido_pedido
-                            FOREIGN KEY (id_pedido)
-                            REFERENCES Pedido(id_pedido),
+                    CONSTRAINT fk_item_pedido_pedido
+                        FOREIGN KEY (id_pedido)
+                        REFERENCES Pedido(id_pedido),
 
-                        CONSTRAINT fk_item_pedido_produto
-                            FOREIGN KEY (id_produto)
-                            REFERENCES produto(id_produto)
+                    CONSTRAINT fk_item_pedido_produto
+                        FOREIGN KEY (id_produto)
+                        REFERENCES produto(id_produto)
                     )`;
 
                 connection.query(createItemPedidoQuery, (err) => {
@@ -181,13 +181,13 @@ connection.connect((err) => {
                             visualizou BOOLEAN DEFAULT FALSE,
                             data_interacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-                            CONSTRAINT fk_interacao_usuario
-                                FOREIGN KEY (id_usuario)
-                                REFERENCES usuario(id_usuario),
+                        CONSTRAINT fk_interacao_usuario
+                            FOREIGN KEY (id_usuario)
+                            REFERENCES usuario(id_usuario),
 
-                            CONSTRAINT fk_interacao_produto
-                                FOREIGN KEY (id_produto)
-                                REFERENCES produto(id_produto)
+                        CONSTRAINT fk_interacao_produto
+                            FOREIGN KEY (id_produto)
+                            REFERENCES produto(id_produto)
                         )`;
 
                     connection.query(createInteracaoRecomendacaoQuery, (err) => {
@@ -204,6 +204,48 @@ connection.connect((err) => {
     });
 });
 
+app.use(carregarUsuario);
+
+// Verifica quem pode acessar os relatórios
+function verificarAcessoRelatorios(req, res, next) {
+
+    if (!req.usuario) {
+        return res.status(401).json({
+            erro: 'Você precisa fazer login para acessar os relatórios.'
+        });
+    }
+
+    const perfisAutorizados = ['gerente', 'administrador'];
+
+    if (!perfisAutorizados.includes(req.usuario.tipo_perfil)) {
+        return res.status(403).json({
+            erro: 'Acesso permitido somente para Gerentes e Administradores.'
+        });
+    }
+
+    next();
+}
+
+// Sua função de autorização do inventário continua aqui
+function autorizarEdicaoInventario(req, res, next) {
+    
+    if (!req.usuario) {
+        return res.status(401).json({
+            erro: "Faça login para alterar o inventário."
+        });
+    }
+
+    const perfisAutorizados = ["atendente", "gerente", "administrador"];
+    const tipoPerfil = req.usuario.tipo_perfil;
+
+    if (!perfisAutorizados.includes(tipoPerfil)) {
+        return res.status(403).json({
+            erro: "Você não tem permissão para alterar o inventário."
+        });
+    }
+
+    next();
+}
 
 // Aqui começa o Cadastro (criar conta)
 app.post('/cadastro', async (req, res) => {
