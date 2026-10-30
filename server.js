@@ -535,7 +535,7 @@ app.post('/login', async (req, res) => {
 
     console.log('Chegou no servidor o login');
 
-    const { email, senha } = req.body;
+    const { email, senha, perfil } = req.body;
 
     const sql = `
         SELECT *
@@ -562,6 +562,12 @@ app.post('/login', async (req, res) => {
             }
 
             const usuario = results[0];
+
+            if (perfil && usuario.tipo_perfil !== perfil) {
+                return res.status(403).json({
+                    erro: 'Esta conta não pertence ao perfil selecionado.'
+                });
+            }
 
             const senhaCorreta = await bcrypt.compare(
                 senha,
