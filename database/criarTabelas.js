@@ -120,7 +120,7 @@ async function criarTabelas(connection) {
         console.log('Tabela interacao_recomendacao verificada/criada com sucesso!');
 
 
-        // Tabela de controle dos relatórios - RF04
+        // Tabela de controle dos relatórios - RF04 (Tabela adicionada conforme foi necessário)
         const createRelatorioJobQuery = `
             CREATE TABLE IF NOT EXISTS relatorio_job (
                 id_job INT AUTO_INCREMENT PRIMARY KEY,
